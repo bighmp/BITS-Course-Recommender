@@ -1,0 +1,7 @@
+google-genai
+pdfplumber
+pydantic
+tqdm
+sentence-transformers
+numpy
+streamlit

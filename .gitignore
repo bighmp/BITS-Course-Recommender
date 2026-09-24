@@ -1,0 +1,17 @@
+# Environment
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+
+# Raw source PDFs — large (500+ files), and not yours to redistribute.
+# README explains how to (re)populate this folder locally.
+data/raw/
+
+# Generated embeddings index — binary, regenerate with build_embeddings.py
+data/embeddings/*.npy
+
+# API keys, local config
+*.key
+.DS_Store
