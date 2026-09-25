@@ -66,6 +66,8 @@ async def extract_one(path: Path, sem: asyncio.Semaphore) -> dict | None:
         text = pdf_to_text(path)
         if not text.strip():
             return {"source_file": path.name, "error": "no extractable text (likely scanned image)"}
+        # Force a 12-second wait to respect the 5 RPM limit
+        await asyncio.sleep(12)
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
