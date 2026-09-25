@@ -32,7 +32,7 @@ RAW_DIR = Path("data/raw/handouts")
 OUT_PATH = Path("data/processed/courses.json")
 CONCURRENCY = 5          
 MAX_RETRIES = 3
-MODEL = "gemini-2.5-flash"       # swap to "gemini-2.5-flash-lite" for even cheaper/faster
+MODEL = "gemini-3.8-flash"       # swap to "gemini-2.5-flash-lite" for even cheaper/faster
 
 client = genai.Client()  # reads GEMINI_API_KEY from env
 
