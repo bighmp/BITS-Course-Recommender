@@ -1,83 +1,68 @@
 """
-Shared data schema for the course recommender's structured dataset.
-Every extraction script writes records that conform to these shapes.
+Builds a semantic search index over course topics/descriptions using a
+local embedding model (no API cost — fine for 500+ documents).
+
+Usage:
+    python build_embeddings.py
+
+Requires: sentence-transformers, numpy
+    pip install sentence-transformers numpy
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional, Literal
+import json
+from pathlib import Path
+
+import numpy as np
+from sentence_transformers import SentenceTransformer
+
+COURSES_PATH = Path("data/processed/courses.json")
+INDEX_PATH = Path("data/embeddings/course_index.npy")
+META_PATH = Path("data/embeddings/course_meta.json")
+
+MODEL_NAME = "all-MiniLM-L6-v2"  # small, fast, good enough for this scale
 
 
-class SourceMeta(BaseModel):
-    source_file: str
-    extraction_confidence: Literal["high", "medium", "low", "needs_verification"] = "high"
+def course_text(course: dict) -> str:
+    """What we embed: title + topics + handout topics + makeup/attendance
+    text, since those are what natural-language queries reference."""
+    parts = [
+        course.get("title", ""),
+        course.get("category") or "",
+        " ".join(course.get("topics", [])),
+    ]
+    handout = course.get("handout") or {}
+    parts.append(" ".join(handout.get("topics", [])))
+    parts.append(handout.get("attendance_policy") or "")
+    parts.append(handout.get("makeup_policy") or "")
+    return " ".join(p for p in parts if p)
 
 
-class HandoutData(BaseModel):
-    attendance_policy: Optional[str] = None
-    has_midsem: Optional[bool] = None
-    has_compre: Optional[bool] = None
-    evaluation_components: list[str] = Field(default_factory=list)
-    makeup_policy: Optional[str] = None
-    instructor: Optional[str] = None
-    topics: list[str] = Field(default_factory=list)  # used for embedding/semantic search
+def main():
+    courses = json.loads(COURSES_PATH.read_text())
+    courses = [c for c in courses if "error" not in c]  # skip failed extractions
+
+    model = SentenceTransformer(MODEL_NAME)
+    texts = [course_text(c) for c in courses]
+    embeddings = model.encode(texts, show_progress_bar=True, normalize_embeddings=True)
+
+    INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    np.save(INDEX_PATH, embeddings)
+    META_PATH.write_text(json.dumps([c["course_code"] for c in courses], indent=2))
+    print(f"Indexed {len(courses)} courses -> {INDEX_PATH}")
 
 
-class Course(BaseModel):
-    course_code: str          # normalized e.g. "BIO F311"
-    title: str
-    department: str
-    units: Optional[float] = None
-    category: Optional[str] = None   # CDC / DEL / HUEL / OPEL / CE etc.
-    topics: list[str] = Field(default_factory=list)
-    prerequisites: list[str] = Field(default_factory=list)
-    restrictions: list[str] = Field(default_factory=list)
-    handout: Optional[HandoutData] = None
-    source: SourceMeta
+def search(query: str, top_k: int = 10) -> list[tuple[str, float]]:
+    """Cosine similarity search. Import this in requirement_engine.py /
+    app.py rather than re-embedding on every query."""
+    model = SentenceTransformer(MODEL_NAME)
+    embeddings = np.load(INDEX_PATH)
+    course_codes = json.loads(META_PATH.read_text())
+
+    q_vec = model.encode([query], normalize_embeddings=True)[0]
+    sims = embeddings @ q_vec  # cosine sim, since both sides are normalized
+    top_idx = np.argsort(-sims)[:top_k]
+    return [(course_codes[i], float(sims[i])) for i in top_idx]
 
 
-class ExtractedCourse(BaseModel):
-    """Same shape as Course but WITHOUT `source` — this is what we hand to
-    Gemini as response_schema, since the model shouldn't be inventing
-    source metadata. extract_handouts.py attaches `source` after the call
-    to build a full Course."""
-    course_code: str
-    title: str
-    department: str
-    units: Optional[float] = None
-    category: Optional[str] = None
-    topics: list[str] = Field(default_factory=list)
-    prerequisites: list[str] = Field(default_factory=list)
-    restrictions: list[str] = Field(default_factory=list)
-    handout: Optional[HandoutData] = None
-    extraction_confidence: Literal["high", "medium", "low", "needs_verification"] = "high"
-
-
-class ProgrammeRule(BaseModel):
-    programme: str             # e.g. "B.E. Biological Sciences"
-    rule_type: Literal["CDC", "DEL", "HUEL", "OPEL", "other"]
-    description: str
-    min_required: Optional[int] = None
-    batch_scope: Optional[str] = None   # which batches this applies to, if stated
-    source: SourceMeta
-
-
-class TimetableEntry(BaseModel):
-    course_code: str
-    section: str
-    instructor: Optional[str] = None
-    days: Optional[str] = None
-    hours: Optional[str] = None
-    room: Optional[str] = None
-    midsem_slot: Optional[str] = None
-    compre_slot: Optional[str] = None
-
-
-class StudentProfile(BaseModel):
-    campus: str
-    admission_year: int
-    degree: str
-    current_semester: int
-    completed_courses: list[str] = Field(default_factory=list)
-    current_courses: list[str] = Field(default_factory=list)
-    minor: Optional[str] = None
-    interests: list[str] = Field(default_factory=list)
+if __name__ == "__main__":
+    main()
