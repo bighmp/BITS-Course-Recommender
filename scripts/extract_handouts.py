@@ -30,7 +30,7 @@ from schema import Course, ExtractedCourse
 
 RAW_DIR = Path("data/raw/handouts")
 OUT_PATH = Path("data/processed/courses.json")
-CONCURRENCY = 5          
+CONCURRENCY = 1        
 MAX_RETRIES = 3
 MODEL = "gemini-3.8-flash"       # swap to "gemini-2.5-flash-lite" for even cheaper/faster
 
@@ -67,7 +67,7 @@ async def extract_one(path: Path, sem: asyncio.Semaphore) -> dict | None:
         if not text.strip():
             return {"source_file": path.name, "error": "no extractable text (likely scanned image)"}
         # Force a 12-second wait to respect the 5 RPM limit
-        await asyncio.sleep(12)
+        await asyncio.sleep(13)
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
