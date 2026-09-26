@@ -37,7 +37,7 @@ from schema import Course, ExtractedCourse
 
 RAW_DIR = Path("data/raw/handouts")
 OUT_PATH = Path("data/processed/courses.json")
-MODEL = "gemini-3.8-flash"     
+MODEL = "gemini-3.8-flash-lite"     
 
 RPM_LIMIT = 5                  # set to your observed/confirmed free-tier cap
 MIN_INTERVAL = 60.0 / RPM_LIMIT  # seconds between ANY two calls, incl. retries

@@ -36,7 +36,10 @@ RAW_DIR = Path("data/raw/handouts")
 OUT_PATH = Path("data/processed/courses.json")
 
 DEPT_PREFIX_RE = re.compile(r"^([A-Z]+)")
-COURSE_NO_RE = re.compile(r"Course\s*No\.?\s*:?\s*([A-Z]{2,6}\s?[FG]\d{3})", re.IGNORECASE)
+COURSE_NO_RE = re.compile(
+    r"Course\s*(?:No\.?|Number)\s*:?\s*\[?\s*(?:[A-Z]+\s*/\s*)*([A-Z]{2,6}\s?[A-Z]\d{2,4}[A-Z]?)",
+    re.IGNORECASE,
+)
 COURSE_TITLE_RE = re.compile(r"Course\s*Title\s*:?\s*(.+)", re.IGNORECASE)
 INSTRUCTOR_RE = re.compile(r"Instructor[- ]in[- ][Cc]harge\s*:?\s*(.+)", re.IGNORECASE)
 
@@ -152,9 +155,17 @@ def find_course_plan_topics(tables: list) -> list[str]:
     return []
 
 
+def fix_repeated_char_artifact(text: str) -> str:
+    triple_run_count = len(re.findall(r"([A-Za-z])\1{2,}", text))
+    if triple_run_count < 15:
+        return text  # not corrupted — leave legitimate triples like "EEE" alone
+    return re.sub(r"([A-Za-z])\1{2,}", r"\1", text)
+
+
 def extract_one(path: Path) -> dict:
     with pdfplumber.open(path) as pdf:
         full_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
+        full_text = fix_repeated_char_artifact(full_text)
         all_tables = []
         for page in pdf.pages:
             all_tables.extend(tables_with_fallback(page))
