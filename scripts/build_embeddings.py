@@ -2,6 +2,10 @@
 Builds a semantic search index over course topics/descriptions using a
 local embedding model (no API cost — fine for 500+ documents).
 
+This is what lets a query like "AI-related DEL" or "lenient makeup policy"
+match courses by meaning rather than exact keyword, before the LLM does
+final explanation. Run this after extract_handouts.py.
+
 Usage:
     python build_embeddings.py
 
@@ -51,12 +55,38 @@ def main():
     print(f"Indexed {len(courses)} courses -> {INDEX_PATH}")
 
 
+_model_cache = None
+_embeddings_cache = None
+_course_codes_cache = None
+
+
+def _get_resources():
+    """Lazy-load once per process, then reuse. Without this, every single
+    Streamlit query would reload the transformer model from disk — fine
+    for a one-off CLI run, painfully slow for an interactive demo.
+
+    IMPORTANT: all three must be assigned together, atomically, after
+    every load succeeds. Assigning them one at a time meant that if
+    np.load() failed (e.g. the embeddings file didn't exist yet), the
+    model would already be cached while embeddings stayed None — and
+    since the guard only checked "is the model cached", every later
+    call would skip reloading and keep reusing that broken half-state
+    for the rest of the process's life, even after the file was fixed.
+    Streamlit doesn't restart its process on every rerun, so this kind
+    of partial-failure caching bug persists silently across queries."""
+    global _model_cache, _embeddings_cache, _course_codes_cache
+    if _model_cache is None or _embeddings_cache is None or _course_codes_cache is None:
+        model = SentenceTransformer(MODEL_NAME)
+        embeddings = np.load(INDEX_PATH)
+        course_codes = json.loads(META_PATH.read_text())
+        _model_cache, _embeddings_cache, _course_codes_cache = model, embeddings, course_codes
+    return _model_cache, _embeddings_cache, _course_codes_cache
+
+
 def search(query: str, top_k: int = 10) -> list[tuple[str, float]]:
     """Cosine similarity search. Import this in requirement_engine.py /
     app.py rather than re-embedding on every query."""
-    model = SentenceTransformer(MODEL_NAME)
-    embeddings = np.load(INDEX_PATH)
-    course_codes = json.loads(META_PATH.read_text())
+    model, embeddings, course_codes = _get_resources()
 
     q_vec = model.encode([query], normalize_embeddings=True)[0]
     sims = embeddings @ q_vec  # cosine sim, since both sides are normalized
