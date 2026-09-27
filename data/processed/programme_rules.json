@@ -1,0 +1,772 @@
+[
+  {
+    "programme": "B.E. Architecture and Urban Engineering",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 48 units (16 courses)",
+    "min_required": 16,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 1)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Architecture and Urban Engineering",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 1)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Architecture and Urban Engineering",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3 (min)', 'Humanities Electives 3 (min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 1)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Architecture and Urban Engineering",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open/Humanities Electives 1', 'Open Electives 8'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 1)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Biotechnology",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open/Humanities Electives 3', 'Open/Humanities Electives 3', 'Open/Humanities Electives 3to6', 'Open/Humanities Electives 3to6', 'Open Electives 5 to 11'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 2)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Chemical",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 45 units (15 courses)",
+    "min_required": 15,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 4)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Chemical",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 15 units (5 courses)",
+    "min_required": 5,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 4)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Chemical",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)', 'Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 4)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Chemical",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open/Humanities Electives 3to6', 'Open Electives 5 to 11'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 4)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Civil",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 48 units (14 courses)",
+    "min_required": 14,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 6)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Civil",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 6)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Civil",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3 (min)', 'Humanities Electives 3 (min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 6)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Civil",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open/Humanities Electives 1 to 4', 'Open Electives 8to14'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 6)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B. E. Computer Science",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 48 units (14 courses)",
+    "min_required": 14,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 7)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B. E. Computer Science",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 7)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B. E. Computer Science",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)', 'Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 7)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B. E. Computer Science",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open/Humanities Electives 3to6', 'Open Electives 6to12'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 7)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Electrical & Electronics",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 47 units (14 courses)",
+    "min_required": 14,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 8)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Electrical & Electronics",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 8)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Electrical & Electronics",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)', 'Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 8)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Electrical & Electronics",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open/Humanities Electives 3to6', 'Open Electives 5to11'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 8)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Electronics & Communication",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 48 units (14 courses)",
+    "min_required": 14,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 9)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Electronics & Communication",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 9)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Electronics & Communication",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)', 'Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 9)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Electronics & Communication",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open Electives 5 to 11'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 9)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Electronics & Computer Engineering",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 48 units (14 courses)",
+    "min_required": 14,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 10)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Electronics & Computer Engineering",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 10)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Electronics & Computer Engineering",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 10)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Electronics & Computer Engineering",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open/Humanities Electives 3 to 6', 'Open/Humanities Electives 6 to 9', 'Open Electives 5 to 11'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 10)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Electronics and Instrumentation",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 48 units (14 courses)",
+    "min_required": 14,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 11)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Electronics and Instrumentation",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 11)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Electronics and Instrumentation",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)', 'Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 11)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Electronics and Instrumentation",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open/Humanities Electives 3to6', 'Open Electives 5to11'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 11)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Environmental and Sustainability Engineering",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 48 units (16 courses)",
+    "min_required": 16,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 12)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Environmental and Sustainability Engineering",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 12)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Environmental and Sustainability Engineering",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open/Humanities Electives 3 to 6', 'Open/Humanities Electives 3 to 6', 'Open/Humanities Electives 6 to 11'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 12)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Mechanical",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 48 units (16 courses)",
+    "min_required": 16,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 13)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Mechanical",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 13)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Mechanical",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)', 'Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 13)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Mechanical",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open Electives 7to13'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 13)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Manufacturing",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 48 units (15 courses)",
+    "min_required": 15,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 15)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Manufacturing",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 15)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Manufacturing",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)', 'Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 15)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Manufacturing",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open Electives 7 to 13'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 15)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Mathematics and Computing",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 48 units (15 courses)",
+    "min_required": 15,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 16)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Mathematics and Computing",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 16)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B.E. Mathematics and Computing",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 16)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B.E. Mathematics and Computing",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open Electives 12 '] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 16)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "B. Pharm.",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 48 units (16 courses)",
+    "min_required": 16,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 18)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B. Pharm.",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 18)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "B. Pharm.",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open/Humanities Electives 2 to 5', 'Open/Humanities Electives 4 to 6', 'Open Electives 6 to 11'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 18)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "M.Sc. Biological Sciences",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 44 units (14 courses)",
+    "min_required": 14,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 19)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "M.Sc. Biological Sciences",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)', 'Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 19)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "M.Sc. Biological Sciences",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open Electives 8 to14'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 19)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "M.Sc. Chemistry",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 47 units (15 courses)",
+    "min_required": 15,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 20)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "M.Sc. Chemistry",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 12 units (4 courses)",
+    "min_required": 4,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 20)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "M.Sc. Chemistry",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)', 'Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 20)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "M.Sc. Chemistry",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open Electives 7 to13'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 20)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "M. Sc. Economics",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 42 units (14 courses)",
+    "min_required": 14,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 21)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "M. Sc. Economics",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 18 units (6 courses)",
+    "min_required": 6,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 21)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "M. Sc. Economics",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)', 'Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 21)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "M. Sc. Economics",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open Electives 5 to 11'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 21)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "M.Sc. Mathematics",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 42 units (14 courses)",
+    "min_required": 14,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 22)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "M.Sc. Mathematics",
+    "rule_type": "DEL",
+    "description": "Discipline Electives \u2014 15 units (5 courses)",
+    "min_required": 5,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 22)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "M.Sc. Mathematics",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)', 'Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 22)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "M.Sc. Mathematics",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open Electives 8 to14'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 22)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "M. Sc. Physics",
+    "rule_type": "CDC",
+    "description": "Discipline Core / Compulsory Discipline Courses \u2014 45 units (15 courses)",
+    "min_required": 15,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 23)",
+      "extraction_confidence": "high"
+    }
+  },
+  {
+    "programme": "M. Sc. Physics",
+    "rule_type": "HUEL",
+    "description": "Humanities Elective slots found in semester pattern: ['Humanities Electives 3(min)', 'Humanities Electives 3(min)'] (needs manual confirmation of total course count)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 23)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "M. Sc. Physics",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open Electives 5 to 11'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 23)",
+      "extraction_confidence": "needs_verification"
+    }
+  },
+  {
+    "programme": "M.Sc. Semiconductor and Nanoscience",
+    "rule_type": "OPEL",
+    "description": "Open Elective slots found in semester pattern: ['Open Electives 3\\n', 'Open Electives 8 to 14'] (needs manual confirmation of total course count \u2014 often blended with Humanities)",
+    "min_required": null,
+    "batch_scope": null,
+    "source": {
+      "source_file": "bulletin-210-313.pdf (page 25)",
+      "extraction_confidence": "needs_verification"
+    }
+  }
+]
