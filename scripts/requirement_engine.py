@@ -1,206 +1,751 @@
 """
-The deterministic core of the recommender. Given a student profile and
-the programme's rules, this computes what's still required and filters
-the full course catalog down to what the student is actually eligible
-to take — BEFORE any preference/interest matching happens.
+Requirement engine for the BITS Academic Course Recommender.
 
-This is intentionally plain Python with no LLM involved anywhere. The
-spec is explicit that eligibility must be deterministic and traceable;
-this module is what makes that true.
+Responsibilities:
+1. Load processed course/rule/category data.
+2. Normalize programme names.
+3. Determine the category of a course for a specific programme.
+4. Compute completed / remaining requirements.
+5. Check prerequisite satisfaction.
+6. Produce a deterministic set of eligible courses.
 
-Two inputs you need to populate by hand (see the bottom of this file
-for a starter template):
-  - data/processed/programme_rules.json  — CDC/DEL/HUEL/OPEL minimums
-    per programme (scope this to 1-2 programmes, not every one BITS
-    offers — see the note at the bottom).
-  - data/processed/course_category_map.json — {course_code: category}
-    for the courses relevant to whichever programme(s) you're testing.
-    Your handout extraction doesn't produce `category` (it's not stated
-    in Part-II handouts, only in the bulletin), so this fills that gap
-    without requiring you to hand-parse the entire 33MB bulletin.
-
-Usage:
-    from requirement_engine import compute_remaining_requirements, get_eligible_courses
+Important:
+- Programme-specific CDC/DEL mappings are authoritative.
+- Global HUEL mappings are used for Humanities Electives.
+- Unknown categories are NOT treated as eligible.
+- Requirements with min_required=None are NOT assumed to be zero.
+  They are reported as "unverified".
+- The engine does not invent academic rules.
 """
+
+from __future__ import annotations
 
 import json
 import re
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+from pydantic import ValidationError
+
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
+
+COURSES_PATH = PROCESSED_DIR / "courses.json"
+RULES_PATH = PROCESSED_DIR / "programme_rules.json"
+CATEGORY_MAP_PATH = PROCESSED_DIR / "course_category_map.json"
+
+
+# ---------------------------------------------------------------------------
+# Imports
+# ---------------------------------------------------------------------------
 
 from schema import Course, ProgrammeRule, StudentProfile
 
-COURSES_PATH = Path("data/processed/courses.json")
-RULES_PATH = Path("data/processed/programme_rules.json")
-CATEGORY_MAP_PATH = Path("data/processed/course_category_map.json")
+
+# ---------------------------------------------------------------------------
+# Normalization helpers
+# ---------------------------------------------------------------------------
+
+def normalize_programme(programme: str) -> str:
+    """
+    Normalize programme names so formatting differences in the bulletin
+    do not affect matching.
+    """
+    if not programme:
+        return ""
+
+    value = str(programme).strip().lower()
+
+    # Remove spaces around periods first:
+    # "B. E." -> "B.E."
+    value = re.sub(r"\s*\.\s*", ".", value)
+
+    # Remove periods from degree abbreviations:
+    # "B.E." -> "BE"
+    value = value.replace(".", "")
+
+    # Normalize separators.
+    value = value.replace("_", " ")
+    value = value.replace("-", " ")
+
+    # Collapse whitespace.
+    value = re.sub(r"\s+", " ", value)
+
+    return value.strip()
 
 
-def normalize_programme(name: str) -> str:
-    """The bulletin itself is inconsistent — 'B. E. Computer Science' vs
-    'B.E. Electrical & Electronics' — so compare on normalized form
-    rather than exact string match, or a real degree name mismatch
-    would silently return zero rules instead of erroring loudly."""
-    return re.sub(r"\s+", " ", name.replace(".", ". ")).strip().lower()
+def normalize_code(course_code: str) -> str:
+    """
+    Normalize a course code.
+
+    Example:
+        "CS F407" -> "CS F407"
+        "cs-f407" -> "CS F407"
+        "CSF407"  -> "CS F407"
+    """
+    if not course_code:
+        return ""
+
+    value = str(course_code).strip().upper()
+
+    # Normalize separators.
+    value = value.replace("-", " ")
+    value = value.replace("_", " ")
+
+    # Collapse whitespace.
+    value = re.sub(r"\s+", " ", value)
+
+    # Handle codes accidentally written without a space:
+    # CSF407 -> CS F407
+    match = re.fullmatch(r"([A-Z]{2,6})\s*([A-Z]?\d{3,4})", value)
+
+    if match:
+        return f"{match.group(1)} {match.group(2)}"
+
+    return value
 
 
-def load_courses() -> list[Course]:
-    raw = json.loads(COURSES_PATH.read_text())
-    return [Course.model_validate(c) for c in raw if "error" not in c]
+# ---------------------------------------------------------------------------
+# Data loading
+# ---------------------------------------------------------------------------
+
+def load_json(path: Path) -> Any:
+    """Load a JSON file."""
+    if not path.exists():
+        raise FileNotFoundError(f"Required file not found: {path}")
+
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
 
-def load_rules() -> list[ProgrammeRule]:
-    if not RULES_PATH.exists():
-        return []
-    raw = json.loads(RULES_PATH.read_text())
-    return [ProgrammeRule.model_validate(r) for r in raw]
+def load_courses() -> List[Course]:
+    """
+    Load processed courses.
+
+    The extraction pipeline may preserve records describing extraction
+    failures, e.g.:
+
+        {"source_file": "...", "error": "course_code not found"}
+
+    These are not actual Course objects, so they are skipped rather than
+    causing the entire requirement engine to fail.
+    """
+    raw = load_json(COURSES_PATH)
+
+    if isinstance(raw, dict):
+        if "courses" in raw:
+            raw = raw["courses"]
+
+    if not isinstance(raw, list):
+        raise ValueError(
+            f"Expected courses.json to contain a list, "
+            f"got {type(raw).__name__}"
+        )
+
+    courses: List[Course] = []
+    skipped = []
+
+    for index, item in enumerate(raw):
+        try:
+            course = Course.model_validate(item)
+            courses.append(course)
+
+        except ValidationError as exc:
+            skipped.append({
+                "index": index,
+                "source_file": item.get("source_file", "unknown"),
+                "error": item.get("error", str(exc)),
+            })
+
+    print(f"Valid courses: {len(courses)}")
+    print(f"Skipped invalid extraction records: {len(skipped)}")
+
+    if skipped:
+        print("\nFirst skipped records:")
+
+        for record in skipped[:10]:
+            print(
+                f" - [{record['index']}] "
+                f"{record['source_file']}: "
+                f"{record['error']}"
+            )
+
+        if len(skipped) > 10:
+            print(
+                f" ... and {len(skipped) - 10} more"
+            )
+
+    return courses
 
 
-def load_category_map() -> dict[str, str]:
-    if not CATEGORY_MAP_PATH.exists():
+def load_rules() -> List[ProgrammeRule]:
+    """Load programme requirement rules."""
+    raw = load_json(RULES_PATH)
+
+    if isinstance(raw, dict):
+        if "rules" in raw:
+            raw = raw["rules"]
+
+    if not isinstance(raw, list):
+        raise ValueError(
+            f"Expected programme_rules.json to contain a list, "
+            f"got {type(raw).__name__}"
+        )
+
+    return [ProgrammeRule.model_validate(item) for item in raw]
+
+
+def load_category_map() -> Dict[str, Any]:
+    """Load the programme-aware course category map."""
+    raw = load_json(CATEGORY_MAP_PATH)
+
+    if not isinstance(raw, dict):
+        raise ValueError(
+            f"Expected course_category_map.json to contain an object, "
+            f"got {type(raw).__name__}"
+        )
+
+    return raw
+
+
+# ---------------------------------------------------------------------------
+# Programme category lookup
+# ---------------------------------------------------------------------------
+
+def get_programme_categories(
+    category_map: Dict[str, Any],
+    programme: str,
+) -> Dict[str, List[str]]:
+    """
+    Return the authoritative CDC/DEL mapping for a programme.
+
+    Expected structure:
+
+    {
+        "__PROGRAMME_CATEGORIES__": {
+            "B.E. Computer Science": {
+                "CDC": [...],
+                "DEL": [...]
+            }
+        }
+    }
+
+    The extractor already handles the difficult PDF parsing.
+    This function only performs normalized lookup.
+    """
+
+    programmes = category_map.get("__PROGRAMME_CATEGORIES__", {})
+
+    if not isinstance(programmes, dict):
         return {}
-    return json.loads(CATEGORY_MAP_PATH.read_text())
+
+    target = normalize_programme(programme)
+
+    for programme_name, categories in programmes.items():
+        if normalize_programme(programme_name) == target:
+            if isinstance(categories, dict):
+                return categories
+            return {}
+
+    return {}
 
 
-def normalize_code(code: str) -> str:
-    """'BIO F311', 'BIO  F311', 'bio f311' all mean the same course —
-    normalize so completed_courses/prerequisites comparisons don't
-    silently fail on whitespace/case differences."""
-    return " ".join(code.upper().split())
+def get_course_category(
+    category_map: Dict[str, Any],
+    programme: str,
+    course_code: str,
+    course_category: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Determine a course's category for a specific programme.
 
+    Priority:
+
+    1. Programme-specific CDC
+    2. Programme-specific DEL
+    3. Global HUEL
+    4. Explicit category already attached to Course
+    5. None / unknown
+
+    We deliberately do NOT infer OPEL from an unknown course.
+    """
+
+    code = normalize_code(course_code)
+
+    programme_categories = get_programme_categories(
+        category_map,
+        programme,
+    )
+
+    # ---------------------------------------------------------------
+    # Programme-specific CDC
+    # ---------------------------------------------------------------
+
+    cdc_courses = programme_categories.get("CDC", [])
+
+    if isinstance(cdc_courses, list):
+        normalized_cdc = {
+            normalize_code(item)
+            for item in cdc_courses
+        }
+
+        if code in normalized_cdc:
+            return "CDC"
+
+    # ---------------------------------------------------------------
+    # Programme-specific DEL
+    # ---------------------------------------------------------------
+
+    del_courses = programme_categories.get("DEL", [])
+
+    if isinstance(del_courses, list):
+        normalized_del = {
+            normalize_code(item)
+            for item in del_courses
+        }
+
+        if code in normalized_del:
+            return "DEL"
+
+    # ---------------------------------------------------------------
+    # Global HUEL
+    # ---------------------------------------------------------------
+
+    global_categories = category_map.get(
+        "__GLOBAL_CATEGORIES__",
+        {},
+    )
+
+    if isinstance(global_categories, dict):
+        huel_courses = global_categories.get("HUEL", [])
+
+        if isinstance(huel_courses, list):
+            normalized_huel = {
+                normalize_code(item)
+                for item in huel_courses
+            }
+
+            if code in normalized_huel:
+                return "HUEL"
+
+    # ---------------------------------------------------------------
+    # Explicit course-level category
+    # ---------------------------------------------------------------
+
+    if course_category:
+        category = str(course_category).strip().upper()
+
+        if category in {"CDC", "DEL", "HUEL", "OPEL"}:
+            return category
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Requirement computation
+# ---------------------------------------------------------------------------
 
 def compute_remaining_requirements(
     profile: StudentProfile,
-    rules: list[ProgrammeRule],
-    category_map: dict[str, str],
-) -> dict[str, dict]:
-    """For each rule_type (CDC/DEL/HUEL/OPEL) applicable to the
-    student's programme, count how many the student has already
-    completed (via category_map) and how many are still needed.
-
-    Returns: {rule_type: {"required": int, "completed": int, "remaining": int, "description": str}}
+    rules: List[ProgrammeRule],
+    category_map: Dict[str, Any],
+) -> Dict[str, Dict[str, Any]]:
     """
-    completed = {normalize_code(c) for c in profile.completed_courses}
+    Compute completed and remaining requirements.
 
-    # tally completed courses by category
-    completed_by_category: dict[str, int] = {}
-    for code in completed:
-        cat = category_map.get(code)
-        if cat:
-            completed_by_category[cat] = completed_by_category.get(cat, 0) + 1
+    Rules with a numeric min_required are considered verified.
 
-    result = {}
-    for rule in rules:
-        if normalize_programme(rule.programme) != normalize_programme(profile.degree):
+    Rules with min_required=None are reported as:
+
+        status = "unverified"
+        required = None
+        remaining = None
+
+    We intentionally do not convert None -> 0.
+    """
+
+    programme = profile.degree
+
+    programme_rules = [
+        rule
+        for rule in rules
+        if normalize_programme(rule.programme)
+        == normalize_programme(programme)
+    ]
+
+    # Count completed courses by category.
+    completed_counts = {
+        "CDC": 0,
+        "DEL": 0,
+        "HUEL": 0,
+        "OPEL": 0,
+    }
+
+    for completed_code in profile.completed_courses:
+        code = normalize_code(completed_code)
+
+        # We don't necessarily have a Course object here, so the
+        # programme-aware category map is used directly.
+        category = get_course_category(
+            category_map=category_map,
+            programme=programme,
+            course_code=code,
+        )
+
+        if category in completed_counts:
+            completed_counts[category] += 1
+
+    remaining: Dict[str, Dict[str, Any]] = {}
+
+    for rule in programme_rules:
+        category = str(rule.rule_type).strip().upper()
+
+        if category not in completed_counts:
             continue
-        if rule.batch_scope and str(profile.admission_year) not in rule.batch_scope:
-            continue  # rule doesn't apply to this student's batch
 
-        required = rule.min_required or 0
-        done = completed_by_category.get(rule.rule_type, 0)
-        result[rule.rule_type] = {
+        completed = completed_counts[category]
+
+        # -----------------------------------------------------------
+        # Unverified requirement
+        # -----------------------------------------------------------
+
+        if rule.min_required is None:
+            remaining[category] = {
+                "required": None,
+                "completed": completed,
+                "remaining": None,
+                "status": "unverified",
+                "description": rule.description,
+            }
+
+            continue
+
+        # -----------------------------------------------------------
+        # Verified numeric requirement
+        # -----------------------------------------------------------
+
+        required = int(rule.min_required)
+
+        remaining[category] = {
             "required": required,
-            "completed": done,
-            "remaining": max(required - done, 0),
+            "completed": completed,
+            "remaining": max(required - completed, 0),
+            "status": "verified",
             "description": rule.description,
         }
-    return result
+
+    # ---------------------------------------------------------------
+    # If a category does not have a rule, do not invent one.
+    # ---------------------------------------------------------------
+
+    return remaining
 
 
-def prerequisites_met(course: Course, completed: set[str]) -> bool:
-    if not course.prerequisites:
+# ---------------------------------------------------------------------------
+# Prerequisite checking
+# ---------------------------------------------------------------------------
+
+def prerequisites_met(
+    course: Course,
+    completed_courses: List[str],
+) -> bool:
+    """
+    Check whether all explicitly listed prerequisites are completed.
+
+    If a course has no prerequisites, it passes automatically.
+
+    This function intentionally only checks prerequisites explicitly
+    represented in the processed Course object.
+    """
+
+    completed = {
+        normalize_code(code)
+        for code in completed_courses
+    }
+
+    prerequisites = getattr(course, "prerequisites", None)
+
+    if not prerequisites:
         return True
-    return all(normalize_code(p) in completed for p in course.prerequisites)
 
+    for prerequisite in prerequisites:
+
+        # Handle string prerequisite.
+        if isinstance(prerequisite, str):
+            if normalize_code(prerequisite) not in completed:
+                return False
+
+        # Handle objects/dicts with a course_code/code field.
+        elif isinstance(prerequisite, dict):
+            prerequisite_code = (
+                prerequisite.get("course_code")
+                or prerequisite.get("code")
+            )
+
+            if prerequisite_code:
+                if normalize_code(prerequisite_code) not in completed:
+                    return False
+
+        # Handle Pydantic-like prerequisite objects.
+        else:
+            prerequisite_code = getattr(
+                prerequisite,
+                "course_code",
+                None,
+            ) or getattr(
+                prerequisite,
+                "code",
+                None,
+            )
+
+            if prerequisite_code:
+                if normalize_code(prerequisite_code) not in completed:
+                    return False
+
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Eligibility
+# ---------------------------------------------------------------------------
 
 def get_eligible_courses(
     profile: StudentProfile,
-    courses: list[Course],
-    remaining_requirements: dict[str, dict],
-    category_map: dict[str, str],
-) -> list[Course]:
-    """The core filter: a course is eligible only if ALL of:
-      1. not already completed
-      2. not currently enrolled in
-      3. prerequisites satisfied
-      4. EITHER it has no category (open elective-ish), OR its category
-         still has remaining slots per remaining_requirements
-
-    This is deliberately conservative — it's meant to narrow the field
-    for the LLM/embedding layer to explain choices from, not to be the
-    final word on every institute rule (restrictions like "not open to
-    X branch" still need per-course handling if your test profiles hit
-    them).
+    courses: List[Course],
+    rules: List[ProgrammeRule],
+    category_map: Dict[str, Any],
+) -> List[Course]:
     """
-    completed = {normalize_code(c) for c in profile.completed_courses}
-    current = {normalize_code(c) for c in profile.current_courses}
-    open_categories = {cat for cat, info in remaining_requirements.items() if info["remaining"] > 0}
+    Return courses that are deterministically eligible.
 
-    eligible = []
+    A course is eligible only if:
+
+    1. It has a known category.
+    2. That category has a verified requirement.
+    3. The student still has remaining slots in that category.
+    4. The course is not already completed.
+    5. Its prerequisites are satisfied.
+
+    Unknown/unclassified courses are excluded.
+
+    This is intentionally conservative. The recommender can later expose
+    such courses as "requires verification" rather than silently calling
+    them eligible.
+    """
+
+    remaining_requirements = compute_remaining_requirements(
+        profile=profile,
+        rules=rules,
+        category_map=category_map,
+    )
+
+    completed = {
+        normalize_code(code)
+        for code in profile.completed_courses
+    }
+
+    eligible: List[Course] = []
+
     for course in courses:
-        code = normalize_code(course.course_code)
-        if code in completed or code in current:
-            continue
-        if not prerequisites_met(course, completed):
+
+        course_code = normalize_code(course.course_code)
+
+        # -----------------------------------------------------------
+        # Already completed
+        # -----------------------------------------------------------
+
+        if course_code in completed:
             continue
 
-        category = category_map.get(code) or course.category
-        # no known category -> treat as an open/general elective, don't block it
-        if category and category not in open_categories:
+        # -----------------------------------------------------------
+        # Determine category
+        # -----------------------------------------------------------
+
+        course_category = getattr(
+            course,
+            "category",
+            None,
+        )
+
+        category = get_course_category(
+            category_map=category_map,
+            programme=profile.degree,
+            course_code=course_code,
+            course_category=course_category,
+        )
+
+        # Unknown category -> do not guess.
+        if category is None:
+            continue
+
+        # -----------------------------------------------------------
+        # Find requirement for category
+        # -----------------------------------------------------------
+
+        requirement = remaining_requirements.get(category)
+
+        if requirement is None:
+            continue
+
+        # -----------------------------------------------------------
+        # Unverified requirement -> not deterministically eligible
+        # -----------------------------------------------------------
+
+        if requirement.get("status") != "verified":
+            continue
+
+        # -----------------------------------------------------------
+        # Requirement already satisfied
+        # -----------------------------------------------------------
+
+        if requirement.get("remaining", 0) <= 0:
+            continue
+
+        # -----------------------------------------------------------
+        # Prerequisites
+        # -----------------------------------------------------------
+
+        if not prerequisites_met(
+            course,
+            profile.completed_courses,
+        ):
+            continue
+
+        if course_code in {
+            normalize_code(c.course_code)
+            for c in eligible
+        }:
             continue
 
         eligible.append(course)
+
     return eligible
 
 
-if __name__ == "__main__":
-    # Quick smoke test with a made-up profile — replace with a real one
-    # once programme_rules.json and course_category_map.json exist.
+# ---------------------------------------------------------------------------
+# Debug helpers
+# ---------------------------------------------------------------------------
+
+def print_requirements(
+    remaining_requirements: Dict[str, Dict[str, Any]]
+) -> None:
+    """Pretty-print requirement information."""
+
+    print("\n=== REMAINING REQUIREMENTS ===")
+
+    print(json.dumps(
+        remaining_requirements,
+        indent=2,
+        ensure_ascii=False,
+    ))
+
+
+def print_eligible_courses(
+    eligible_courses: List[Course],
+) -> None:
+    """Print eligible courses."""
+
+    print("\n=== ELIGIBLE COURSES ===")
+    print(
+        f"{len(eligible_courses)} eligible courses"
+    )
+
+    for course in eligible_courses:
+        code = getattr(course, "course_code", "?")
+        title = getattr(course, "title", "?")
+        category = getattr(course, "category", None)
+
+        print(
+            f" - {code}: {title}"
+            f" [{category or 'programme-mapped'}]"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Smoke test
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+
+    print("Loading processed data...")
+
     courses = load_courses()
     rules = load_rules()
     category_map = load_category_map()
 
-    test_profile = StudentProfile(
+    print(f"Courses loaded: {len(courses)}")
+    print(f"Programme rules loaded: {len(rules)}")
+    print(f"Category map entries: {len(category_map)}")
+
+    # ---------------------------------------------------------------
+    # Test profile
+    # ---------------------------------------------------------------
+
+    profile = StudentProfile(
         campus="Pilani",
-        admission_year=2023,
+        admission_year=2025,
         degree="B.E. Computer Science",
-        current_semester=5,
-        completed_courses=["CS F211", "MATH F211"],
-        current_courses=[],
-        interests=["AI", "security"],
+        current_semester=3,
+        completed_courses=["CS F211"],
+        interests=[
+            "machine learning",
+            "artificial intelligence",
+            "computer science",
+        ],
+        minor=None,
     )
 
-    remaining = compute_remaining_requirements(test_profile, rules, category_map)
-    print("Remaining requirements:", json.dumps(remaining, indent=2))
+    # ---------------------------------------------------------------
+    # Category lookup tests
+    # ---------------------------------------------------------------
 
-    eligible = get_eligible_courses(test_profile, courses, remaining, category_map)
-    print(f"\n{len(eligible)} eligible courses out of {len(courses)} total.")
-    for c in eligible[:10]:
-        print(" -", c.course_code, c.title)
+    print("\n=== CATEGORY LOOKUPS ===")
 
-# --- programme_rules.json starter template ---
-# Create data/processed/programme_rules.json with entries like this,
-# scoped to 1-2 programmes (per earlier advice, don't try to cover
-# every BITS programme):
-#
-# [
-#   {
-#     "programme": "B.E. Computer Science",
-#     "rule_type": "DEL",
-#     "description": "Department Elective — 4 courses required",
-#     "min_required": 4,
-#     "batch_scope": null,
-#     "source": {"source_file": "bulletin.pdf (manual)", "extraction_confidence": "high"}
-#   },
-#   {
-#     "programme": "B.E. Computer Science",
-#     "rule_type": "HUEL",
-#     "description": "Humanities elective — 2 courses required",
-#     "min_required": 2,
-#     "batch_scope": null,
-#     "source": {"source_file": "bulletin.pdf (manual)", "extraction_confidence": "high"}
-#   }
-# ]
-#
-# --- course_category_map.json starter template ---
-# {"CS F211": "CDC", "CS F215": "DEL", "HSS F223": "HUEL", ...}
-# Only needs entries for courses your test profile could plausibly hit
-# — not all 540. Grow it as you test more queries.
+    test_courses = [
+        "CS F211",
+        "CS F407",
+        "HSS F222",
+    ]
+
+    for code in test_courses:
+        category = get_course_category(
+            category_map,
+            profile.degree,
+            code,
+        )
+
+        print(f"{code}: {category}")
+
+    # ---------------------------------------------------------------
+    # Requirement calculation
+    # ---------------------------------------------------------------
+
+    remaining_requirements = compute_remaining_requirements(
+        profile=profile,
+        rules=rules,
+        category_map=category_map,
+    )
+
+    print_requirements(remaining_requirements)
+
+    # ---------------------------------------------------------------
+    # Eligibility
+    # ---------------------------------------------------------------
+
+    eligible = get_eligible_courses(
+        profile=profile,
+        courses=courses,
+        rules=rules,
+        category_map=category_map,
+    )
+
+    print_eligible_courses(eligible)
+
+
+if __name__ == "__main__":
+    main()
