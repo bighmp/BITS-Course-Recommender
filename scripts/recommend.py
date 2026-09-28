@@ -1,155 +1,399 @@
-"""
-The natural-language query layer. Takes a free-text request like
-"Suggest an AI-related DEL with no midsem" and turns it into ranked,
-explained recommendations — using keyword rules + embedding similarity,
-NOT an LLM. This means it works with zero API cost/quota risk; a small
-LLM call can be layered on top later purely to make the explanation
-prose nicer, without changing anything about how eligibility or
-matching is decided.
-
-Pipeline:
-    query text
-      -> parse_query()      : pull out explicit constraints (category,
-                               no-midsem, no-attendance, etc.) via
-                               keyword rules
-      -> eligible courses    : from requirement_engine (already computed
-                               from the student's profile)
-      -> filter by category  : drop courses known to be the WRONG
-                               category (e.g. a known-CDC course when
-                               they asked for a DEL) — courses with no
-                               known category pass through, since our
-                               category map only covers CDC (see
-                               extract_category_map.py's docstring)
-      -> filter by handout attributes : has_midsem/has_compre/attendance/
-                               makeup leniency, using known handout data;
-                               unknown data is never treated as a match
-                               OR a rejection — it's flagged "could not
-                               be verified" per the spec's own instruction
-      -> rank by embedding similarity to the free-text interest portion
-      -> template-explain each result
-
-Usage:
-    from recommend import recommend
-    results = recommend(profile, "suggest an AI-related DEL with no midsem", courses, rules, category_map)
-"""
-
-import json
+import os
 import re
-from pathlib import Path
+from functools import lru_cache
+
+from pydantic import BaseModel, Field
+from google import genai
+from google.genai import types
 
 from schema import Course, StudentProfile
-from requirement_engine import compute_remaining_requirements, get_eligible_courses
+from requirement_engine import (
+    compute_remaining_requirements,
+    get_eligible_courses,
+)
 from build_embeddings import search as embedding_search
 
-CATEGORY_KEYWORDS = {
-    "CDC": [r"\bcdc\b", r"core course"],
-    "DEL": [r"\bdel\b", r"discipline elective"],
-    "HUEL": [r"\bhuel\b", r"humanit(y|ies) elective"],
-    "OPEL": [r"\bopel\b", r"open elective"],
-}
 
-NO_MIDSEM_RE = re.compile(r"no\s*mid-?\s*sem", re.IGNORECASE)
-NO_COMPRE_RE = re.compile(r"no\s*compre", re.IGNORECASE)
-NO_ATTENDANCE_RE = re.compile(r"no\s*attendance", re.IGNORECASE)
-LENIENT_MAKEUP_RE = re.compile(r"lenient|flexible|easy(?:-going)?\s*makeup", re.IGNORECASE)
-PROJECT_BASED_RE = re.compile(r"project[- ]based|project\s*evaluation", re.IGNORECASE)
+# ============================================================
+# GEMINI
+# ============================================================
 
-# Phrases suggesting a makeup policy is genuinely strict — used as the
-# "lenient" check's negative signal, since we have no numeric leniency
-# score, just free text.
-STRICT_MAKEUP_PHRASES = ["will not be granted", "no makeup", "not granted in any condition", "strictly"]
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+# You said this is the model that works in your setup.
+MODEL_NAME = "gemini-3.8-flash"
 
 
-def parse_query(query: str) -> dict:
-    """Rule-based, not an LLM — but covers every example phrasing in the
-    spec ('AI-related DEL', 'no attendance requirement', 'lenient makeup
-    policy', 'project-based evaluation')."""
-    constraints = {
-        "category": None,
-        "no_midsem": bool(NO_MIDSEM_RE.search(query)),
-        "no_compre": bool(NO_COMPRE_RE.search(query)),
-        "no_attendance": bool(NO_ATTENDANCE_RE.search(query)),
-        "lenient_makeup": bool(LENIENT_MAKEUP_RE.search(query)),
-        "project_based": bool(PROJECT_BASED_RE.search(query)),
-    }
-    for category, patterns in CATEGORY_KEYWORDS.items():
-        if any(re.search(p, query, re.IGNORECASE) for p in patterns):
-            constraints["category"] = category
-            break
-    return constraints
+# ============================================================
+# LLM QUERY SCHEMA
+# ============================================================
+
+class QueryConstraints(BaseModel):
+    category: str | None = Field(
+        default=None,
+        description="CDC, DEL, HUEL, OPEL, or null",
+    )
+
+    topics: list[str] = Field(
+        default_factory=list,
+        description="Academic topics/interests mentioned in the query",
+    )
+
+    requires_no_attendance: bool = Field(
+        default=False,
+        description="True only if the student explicitly wants no attendance requirement",
+    )
+
+    requires_no_midsem: bool = Field(
+        default=False,
+        description="True only if the student explicitly wants no mid-semester exam",
+    )
+
+    requires_no_compre: bool = Field(
+        default=False,
+        description="True only if the student explicitly wants no comprehensive exam",
+    )
+
+    lenient_makeup: bool = Field(
+        default=False,
+        description="True if the student prefers a lenient/flexible makeup policy",
+    )
+
+    project_based: bool = Field(
+        default=False,
+        description="True if the student prefers project-based evaluation",
+    )
+
+    semantic_query: str = Field(
+        default="",
+        description="Compact semantic search query for the student's interests",
+    )
 
 
-def _attribute_check(course: Course, constraints: dict) -> tuple[bool, list[str]]:
-    """Returns (passes, unverifiable_notes). A course is excluded only
-    when we KNOW it fails a constraint — unknown data never excludes,
-    it just gets flagged, per the spec: 'if a requested property is not
-    explicitly available... the answer should state that it could not
-    be verified.'"""
+# ============================================================
+# LLM INTENT EXTRACTION
+# ============================================================
+
+@lru_cache(maxsize=128)
+def extract_intent_llm(
+    query: str,
+    profile_degree: str,
+) -> QueryConstraints:
+    """
+    Uses Gemini to translate natural language into structured
+    preferences.
+
+    IMPORTANT:
+    Gemini does NOT determine academic eligibility.
+    """
+
+    prompt = f"""
+You are an intent-extraction component for a BITS academic
+course recommender.
+
+Student programme:
+{profile_degree}
+
+Extract the student's course-search preferences into JSON.
+
+Rules:
+
+1. Do NOT determine whether a course is academically eligible.
+2. Do NOT invent BITS rules.
+3. Only extract what the student is asking for.
+4. category must be one of:
+   CDC, DEL, HUEL, OPEL, or null.
+5. requires_no_attendance is true only when the student explicitly
+   asks for no attendance requirement.
+6. requires_no_midsem is true only when the student explicitly
+   asks for no midsem / no mid-semester exam.
+7. requires_no_compre is true only when the student explicitly
+   asks for no compre / comprehensive exam.
+8. lenient_makeup is true when the student asks for lenient,
+   flexible, easy-going, or similar makeup policy.
+9. project_based is true when the student asks for project-based
+   evaluation.
+10. topics should contain concise academic interests.
+11. semantic_query should be a concise description of the
+    student's academic interests for semantic retrieval.
+12. Anything not mentioned should be null, false, or empty.
+
+Examples:
+
+User:
+"Suggest a DEL related to AI"
+
+category:
+DEL
+
+topics:
+["artificial intelligence", "machine learning"]
+
+User:
+"I want an OPEL with no attendance requirement"
+
+category:
+OPEL
+
+requires_no_attendance:
+true
+
+User:
+"Suggest an AI-related DEL with no midsem and preferably project based"
+
+category:
+DEL
+
+topics:
+["artificial intelligence", "machine learning"]
+
+requires_no_midsem:
+true
+
+project_based:
+true
+
+Student query:
+"{query}"
+"""
+
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=QueryConstraints,
+            temperature=0.1,
+        ),
+    )
+
+    return QueryConstraints.model_validate_json(response.text)
+
+
+# ============================================================
+# ATTRIBUTE FILTERING
+# ============================================================
+
+STRICT_MAKEUP_PHRASES = [
+    "will not be granted",
+    "no makeup",
+    "not granted in any condition",
+    "strictly",
+]
+
+
+def _attribute_check(
+    course: Course,
+    constraints: QueryConstraints,
+) -> tuple[bool, list[str]]:
+    """
+    Returns:
+        (passes, unverifiable_notes)
+
+    A course is rejected only when we KNOW that it violates
+    a requested constraint.
+
+    Unknown data is NOT treated as a failure.
+    """
+
     h = course.handout
     notes = []
 
-    if constraints["no_midsem"]:
+    # --------------------------------------------------------
+    # NO MIDSEM
+    # --------------------------------------------------------
+
+    if constraints.requires_no_midsem:
         if h and h.has_midsem is True:
             return False, notes
-        if not h or h.has_midsem is None:
-            notes.append("midsem status could not be verified from the handout")
 
-    if constraints["no_compre"]:
+        if not h or h.has_midsem is None:
+            notes.append(
+                "midsem status could not be verified from the handout"
+            )
+
+    # --------------------------------------------------------
+    # NO COMPRE
+    # --------------------------------------------------------
+
+    if constraints.requires_no_compre:
         if h and h.has_compre is True:
             return False, notes
+
         if not h or h.has_compre is None:
-            notes.append("comprehensive exam status could not be verified from the handout")
+            notes.append(
+                "comprehensive exam status could not be verified from the handout"
+            )
 
-    if constraints["no_attendance"]:
-        if h and h.attendance_policy and "not linked" not in h.attendance_policy.lower():
-            # has a stated attendance policy that isn't explicitly "not linked to evaluation"
-            if "attend" in h.attendance_policy.lower():
+    # --------------------------------------------------------
+    # NO ATTENDANCE
+    # --------------------------------------------------------
+
+    if constraints.requires_no_attendance:
+        if h and h.attendance_policy:
+            attendance = h.attendance_policy.lower()
+
+            # The existing project convention treats
+            # "not linked" as satisfying the no-attendance request.
+            if "not linked" not in attendance and "attend" in attendance:
                 return False, notes
-        if not h or not h.attendance_policy:
-            notes.append("attendance policy could not be verified from the handout")
 
-    if constraints["lenient_makeup"]:
+        else:
+            notes.append(
+                "attendance policy could not be verified from the handout"
+            )
+
+    # --------------------------------------------------------
+    # LENIENT MAKEUP
+    # --------------------------------------------------------
+
+    if constraints.lenient_makeup:
         if h and h.makeup_policy:
-            if any(p in h.makeup_policy.lower() for p in STRICT_MAKEUP_PHRASES):
+            makeup = h.makeup_policy.lower()
+
+            if any(
+                phrase in makeup
+                for phrase in STRICT_MAKEUP_PHRASES
+            ):
                 return False, notes
         else:
-            notes.append("makeup policy could not be verified from the handout")
+            notes.append(
+                "makeup policy could not be verified from the handout"
+            )
 
-    if constraints["project_based"]:
+    # --------------------------------------------------------
+    # PROJECT BASED
+    # --------------------------------------------------------
+
+    if constraints.project_based:
         if h and h.evaluation_components:
-            blob = " ".join(h.evaluation_components).lower()
+            blob = " ".join(
+                h.evaluation_components
+            ).lower()
+
             if "project" not in blob:
                 return False, notes
         else:
-            notes.append("evaluation components could not be verified from the handout")
+            notes.append(
+                "evaluation components could not be verified from the handout"
+            )
 
     return True, notes
 
 
-def _explain(course: Course, constraints: dict, notes: list[str], similarity: float, category_map: dict[str, str]) -> str:
+# ============================================================
+# EXPLANATION
+# ============================================================
+
+def _explain(
+    course: Course,
+    constraints: QueryConstraints,
+    notes: list[str],
+    similarity: float,
+    category_map: dict[str, str],
+) -> str:
     parts = []
-    if constraints["category"]:
-        known_category = category_map.get(course.course_code, course.category)
-        if known_category == constraints["category"]:
-            parts.append(f"confirmed {constraints['category']} — satisfies your remaining requirement")
+
+    # --------------------------------------------------------
+    # CATEGORY
+    # --------------------------------------------------------
+
+    if constraints.category:
+        known_category = category_map.get(
+            course.course_code,
+            course.category,
+        )
+
+        if known_category == constraints.category:
+            parts.append(
+                f"confirmed {constraints.category} — satisfies your remaining requirement"
+            )
         else:
-            notes.append(f"category not confirmed in our data; treated as an eligible elective, not verified as {constraints['category']}")
+            notes.append(
+                f"category not confirmed in our data; "
+                f"treated as an eligible elective, not verified as "
+                f"{constraints.category}"
+            )
+
+    # --------------------------------------------------------
+    # NO MIDSEM
+    # --------------------------------------------------------
+
     h = course.handout
-    if constraints["no_midsem"] and h and h.has_midsem is False:
-        parts.append("has no mid-semester exam")
-    if constraints["no_attendance"] and h and h.attendance_policy:
-        parts.append("attendance is not linked to evaluation")
-    if constraints["lenient_makeup"] and h and h.makeup_policy:
-        parts.append("makeup policy looks relatively flexible")
-    if constraints["project_based"] and h and h.evaluation_components:
-        parts.append("evaluation includes a project component")
+
+    if constraints.requires_no_midsem and h:
+        if h.has_midsem is False:
+            parts.append("has no mid-semester exam")
+
+    # --------------------------------------------------------
+    # NO ATTENDANCE
+    # --------------------------------------------------------
+
+    if constraints.requires_no_attendance and h:
+        if h.attendance_policy:
+            if "not linked" in h.attendance_policy.lower():
+                parts.append("attendance is not linked to evaluation")
+
+    # --------------------------------------------------------
+    # NO COMPRE
+    # --------------------------------------------------------
+
+    if constraints.requires_no_compre and h:
+        if h.has_compre is False:
+            parts.append("has no comprehensive exam")
+
+    # --------------------------------------------------------
+    # MAKEUP
+    # --------------------------------------------------------
+
+    if constraints.lenient_makeup and h:
+        if h.makeup_policy:
+            parts.append("makeup policy appears relatively flexible")
+
+    # --------------------------------------------------------
+    # PROJECT
+    # --------------------------------------------------------
+
+    if constraints.project_based and h:
+        if h.evaluation_components:
+            blob = " ".join(
+                h.evaluation_components
+            ).lower()
+
+            if "project" in blob:
+                parts.append(
+                    "evaluation includes a project component"
+                )
+
+    # --------------------------------------------------------
+    # DEFAULT
+    # --------------------------------------------------------
+
     if not parts:
-        parts.append(f"matches your query (topic similarity: {similarity:.2f})")
-    explanation = "This course " + "; ".join(parts) + "."
+        parts.append(
+            f"matches your request based on semantic similarity "
+            f"({similarity:.2f})"
+        )
+
+    explanation = (
+        "This course "
+        + "; ".join(parts)
+        + "."
+    )
+
     if notes:
-        explanation += " Note: " + "; ".join(notes) + "."
+        explanation += (
+            " Note: "
+            + "; ".join(notes)
+            + "."
+        )
+
     return explanation
 
+
+# ============================================================
+# MAIN RECOMMENDER
+# ============================================================
 
 def recommend(
     profile: StudentProfile,
@@ -159,74 +403,160 @@ def recommend(
     category_map: dict[str, str],
     top_k: int = 5,
 ) -> list[dict]:
-    constraints = parse_query(query)
+    """
+    Main recommendation pipeline.
 
-    remaining = compute_remaining_requirements(profile, rules, category_map)
-    eligible = get_eligible_courses(profile, courses, remaining, category_map)
+    1. Gemini extracts natural-language intent.
+    2. Requirement engine calculates remaining requirements.
+    3. Requirement engine determines eligible courses.
+    4. Hard constraints are applied deterministically.
+    5. Embeddings rank the remaining courses.
+    6. Results receive deterministic explanations.
+    """
 
-    # category filter: exclude only courses we KNOW are the wrong category
-    if constraints["category"]:
+    # ========================================================
+    # 1. LLM: UNDERSTAND USER QUERY
+    # ========================================================
+
+    constraints = extract_intent_llm(
+        query.strip(),
+        profile.degree,
+    )
+
+    # TEMPORARY DEBUG OUTPUT
+    print("\n===== LLM INTENT =====")
+    print(constraints.model_dump())
+    print("======================\n")
+
+    # ========================================================
+    # 2. REQUIREMENT ENGINE
+    # ========================================================
+
+    remaining = compute_remaining_requirements(
+        profile,
+        rules,
+        category_map,
+    )
+
+    eligible = get_eligible_courses(
+        profile,
+        courses,
+        remaining,
+        category_map,
+    )
+
+    # ========================================================
+    # 3. CATEGORY FILTER
+    # ========================================================
+
+    if constraints.category:
         eligible = [
-            c for c in eligible
-            if category_map.get(c.course_code, c.category) in (None, constraints["category"])
+            c
+            for c in eligible
+            if category_map.get(
+                c.course_code,
+                c.category,
+            ) in (
+                None,
+                constraints.category,
+            )
         ]
 
-    # attribute filters
+    # ========================================================
+    # 4. ATTRIBUTE FILTERS
+    # ========================================================
+
     filtered = []
-    for c in eligible:
-        passes, notes = _attribute_check(c, constraints)
+
+    for course in eligible:
+        passes, notes = _attribute_check(
+            course,
+            constraints,
+        )
+
         if passes:
-            filtered.append((c, notes))
+            filtered.append(
+                (course, notes)
+            )
 
     if not filtered:
         return []
 
-    # rank by embedding similarity to the raw query text
-    ranked_codes = embedding_search(query, top_k=len(filtered) * 3)  # over-fetch, then intersect
-    rank_lookup = {code: score for code, score in ranked_codes}
-    filtered.sort(key=lambda pair: rank_lookup.get(pair[0].course_code, 0.0), reverse=True)
+    # ========================================================
+    # 5. SEMANTIC RANKING
+    # ========================================================
 
-    # dedupe by course_code — multiple handout files for the same course
-    # (different sections/years) shouldn't show up as separate results.
-    # filtered is already sorted by rank at this point, so the first
-    # occurrence kept per code is the highest-ranked one.
+    semantic_query = (
+        constraints.semantic_query.strip()
+        if constraints.semantic_query.strip()
+        else " ".join(constraints.topics)
+    )
+
+    if not semantic_query:
+        semantic_query = query
+
+    ranked_codes = embedding_search(
+        semantic_query,
+        top_k=max(len(filtered) * 3, top_k * 3),
+    )
+
+    # embedding_search returns:
+    # [(course_code, similarity), ...]
+
+    rank_lookup = {
+        code: score
+        for code, score in ranked_codes
+    }
+
+    filtered.sort(
+        key=lambda pair: rank_lookup.get(
+            pair[0].course_code,
+            0.0,
+        ),
+        reverse=True,
+    )
+
+    # ========================================================
+    # 6. DEDUPLICATE
+    # ========================================================
+
     seen_codes = set()
     deduped = []
+
     for course, notes in filtered:
         if course.course_code in seen_codes:
             continue
+
         seen_codes.add(course.course_code)
-        deduped.append((course, notes))
+        deduped.append(
+            (course, notes)
+        )
+
+    # ========================================================
+    # 7. BUILD RESULTS
+    # ========================================================
 
     results = []
+
     for course, notes in deduped[:top_k]:
-        similarity = rank_lookup.get(course.course_code, 0.0)
-        results.append({
-            "course_code": course.course_code,
-            "title": course.title,
-            "explanation": _explain(course, constraints, notes, similarity, category_map),
-        })
+
+        similarity = rank_lookup.get(
+            course.course_code,
+            0.0,
+        )
+
+        results.append(
+            {
+                "course_code": course.course_code,
+                "title": course.title,
+                "explanation": _explain(
+                    course,
+                    constraints,
+                    notes,
+                    similarity,
+                    category_map,
+                ),
+            }
+        )
+
     return results
-
-
-if __name__ == "__main__":
-    from requirement_engine import load_courses, load_rules, load_category_map
-
-    courses = load_courses()
-    rules = load_rules()
-    category_map = load_category_map()
-
-    test_profile = StudentProfile(
-        campus="Pilani", admission_year=2023, degree="B.E. Computer Science",
-        current_semester=5, completed_courses=["CS F211", "CS F212", "CS F213"],
-        current_courses=[], interests=["AI", "security"],
-    )
-
-    for q in [
-        "Suggest an AI-related DEL",
-        "I want a course with no midsem",
-        "Suggest courses with no attendance requirement and lenient makeup policy",
-    ]:
-        print(f"\n=== Query: {q!r} ===")
-        for r in recommend(test_profile, q, courses, rules, category_map):
-            print(f"- {r['course_code']} ({r['title']}): {r['explanation']}")
